@@ -28,22 +28,23 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     """
     user_input = update.message.text.lower()
     
-    # 1. Cloud Awareness Check
-    if "running on cloud" in user_input or "where are you" in user_input:
+    # 1. Cloud Awareness Check (Handles "where are you", "where are u", "running on cloud")
+    if any(phrase in user_input for phrase in ["running on cloud", "where are you", "where are u"]):
         response = (
             "Yes, Sir. I am currently running on your **Azure Ubuntu VM (Standard B2ats v2)** in Central India.\n"
             "Public IP: `74.225.248.54`\n"
             "Persistence is managed by **PM2**. I am ready for 24/7 duty."
         )
     
-    # 2. Healthcheck Skill
-    elif "healthcheck" in user_input or "status" in user_input:
+    # 2. Healthcheck Skill (Handles "healthcheck", "health check", "status")
+    elif any(phrase in user_input for phrase in ["healthcheck", "health check", "status"]):
         try:
             # Simple check of memory availability on the VM
             mem_info = subprocess.check_output(['free', '-m']).decode('utf-8')
             response = f"Systems are nominal, Sir.\n\n**Memory Status:**\n`{mem_info}`"
         except Exception as e:
             response = f"I encountered an issue checking system health: {str(e)}"
+
 
     # 3. Default Persona Response
     else:
