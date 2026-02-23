@@ -3,6 +3,9 @@ import logging
 from dotenv import load_dotenv
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 
+# Load environment variables first
+load_dotenv()
+
 # Import our custom handlers
 from handlers import start_handler, text_message_handler
 
@@ -13,10 +16,8 @@ logging.basicConfig(
 )
 
 def main():
-    # Load environment variables from the .env file
-    load_dotenv()
-    
     BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
     if not BOT_TOKEN or BOT_TOKEN == "your_bot_token_here":
         logging.error("TELEGRAM_BOT_TOKEN is missing or invalid in the .env file.")
         return
