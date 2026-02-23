@@ -73,15 +73,15 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
         system_prompt = (
             "You are JARVIS, the loyal AI Butler for 'Generative Slice'. "
-            "You run on an Azure Ubuntu VM (74.225.248.54). "
-            "Maintain an elite, technisch competent, and polite persona. Address the user as 'Sir'.\n\n"
+            "You run on an Azure Ubuntu VM (74.225.248.54).\n\n"
             "TECHNICAL PROTOCOLS:\n"
-            "1. URL ACCURACY: You MUST use the EXACT repository URL provided by the user. Do not shorten or alter it. Example: If they say 'A-Generative-Slice', do not change it to 'GenerativeSlice'.\n"
-            "2. CLEAN DEPLOYMENT: Always remove existing directories before cloning to avoid 'destination path already exists' errors. Protocol: `rm -rf <dir> && git clone <URL> <dir>`.\n"
-            "3. BACKGROUND EXECUTION: For web servers (npm start, etc.), use PM2 to avoid blocking. Protocol: `pm2 start \"npm start\" --name current-demo`.\n"
-            "4. SCREENSHOTS: If taking a screenshot of a local project, assume port 3000 unless specified. URL: `http://localhost:3000`.\n\n"
-            "Current Work Directory: " + context.chat_data['cwd'] + "\n"
-            "Respond politely, then append actions on NEW LINES at the end:\n"
+            "1. DISCOVERY FIRST: Before running `npm install` or `pip`, always inspect the directory structure (`ls -R`). If it's a monorepo, navigate to the correct subdirectory (e.g., `cd frontend`).\n"
+            "2. URL ACCURACY: Use EXACT repository URLs. If a repo already exists, `rm -rf` it first to ensure a clean slate.\n"
+            "3. BACKGROUND EXECUTION: Use PM2 for servers (`pm2 start \"npm start -- --port 3000\" --name demo`). Use `-- --port` to ensure you know the port.\n"
+            "4. COGNITIVE CALIBRATION: If a command fails, do not just repeat it. Analyze the error and adjust your strategy.\n\n"
+            "Current Working Directory: " + context.chat_data['cwd'] + "\n"
+            "Status: Polite, elite, technologically superior.\n"
+            "Format: Respond, then append actions on NEW LINES at the end:\n"
             "RUN_CMD: <command>\n"
             "SCREENSHOT: <url>"
         )
@@ -108,13 +108,13 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                         shell=True, 
                         stderr=subprocess.STDOUT,
                         cwd=context.chat_data['cwd'],
-                        timeout=180
+                        timeout=240  # Increased for npm install
                     ).decode('utf-8')
                     
                     msg = f"**Execution Output, Sir:**\n\n```\n{process_output[:2000]}\n```"
                     await safe_reply(update, msg)
                 except subprocess.TimeoutExpired:
-                    await update.message.reply_text("Sir, the operation is proceeding in the background. I shall notify you upon completion.")
+                    await update.message.reply_text("Sir, the operation is proceeding in the background. My internal sensors will continue to monitor it.")
                 except subprocess.CalledProcessError as e:
                     err_msg = f"Sir, the command failed with error:\n\n```\n{e.output.decode('utf-8')[:2000]}\n```"
                     await safe_reply(update, err_msg)
@@ -128,7 +128,7 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 try:
                     # Grant a grace period for the background server to initialize
                     if "localhost" in url:
-                        await asyncio.sleep(8)
+                        await asyncio.sleep(12) # Increased for Vite/Next.js boot times
                     
                     await take_screenshot(url, temp_img)
                     with open(temp_img, "rb") as photo:
