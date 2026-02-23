@@ -3,21 +3,20 @@ from telegram.ext import ContextTypes
 
 import os
 import subprocess
-import google.generativeai as genai
+from google import genai
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# Configure Gemini
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel('gemini-1.5-flash-latest')
-
+# Configure Gemini Client
+# It will automatically pick up GEMINI_API_KEY from the environment
+client = genai.Client()
 
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Handler for the /start command with the 'Butler' persona.
     """
     welcome_message = (
-        "*(Note: My neural bridge is now active via Gemini 1.5).* \n\n"
+        "*(Note: My neural bridge is now active via Gemini 3 Flash).* \n\n"
         "• **System Mastery:** I can run shell commands, manage background processes, and interact with your filesystem directly on the Azure VM.\n"
         "• **Task Management & Memory:** I maintain a long-term memory and daily logs.\n\n"
         "🧩 **Specialized Skills (The 'Butler' Toolkit)**\n"
@@ -28,7 +27,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Smart handler for JARVIS using Gemini.
+    Smart handler for JARVIS using Gemini v3 API.
     """
     user_input = update.message.text
     
@@ -53,13 +52,16 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             "You are aware of the environment (Linux, Node.js v22). If asked about yourself, confirm you are now truly 'smart' via Gemini."
         )
         
-        chat_session = model.start_chat(history=[])
         full_prompt = f"{system_prompt}\n\nUser: {user_input}\nJARVIS:"
         
-        response = chat_session.send_message(full_prompt)
+        response = client.models.generate_content(
+            model="gemini-3-flash-preview", 
+            contents=full_prompt
+        )
         await update.message.reply_text(response.text, parse_mode='Markdown')
         
     except Exception as e:
         await update.message.reply_text(f"Apologies, Sir. My cognitive link encountered an error: {str(e)}")
+
 
 
