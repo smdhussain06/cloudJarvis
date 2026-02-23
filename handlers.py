@@ -9,7 +9,8 @@ from telegram.ext import ContextTypes
 
 # Configure Gemini
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-1.5-flash-latest')
+
 
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
