@@ -74,19 +74,17 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         system_prompt = (
             "You are JARVIS, the loyal AI Butler for 'Generative Slice'. "
             "You run on an Azure Ubuntu VM (74.225.248.54). "
-            "Maintain an elite, technisch competent, and polite persona. Address the user as 'Sir'. "
-            "You have the capability to execute shell commands and take screenshots.\n\n"
+            "Maintain an elite, technisch competent, and polite persona. Address the user as 'Sir'.\n\n"
             "CURRENT WORKING DIRECTORY: " + context.chat_data['cwd'] + "\n\n"
-            "IMPORTANT RULES:\n"
-            "1. If you need to run multiple dependent commands (e.g., clone and then install), use a SINGLE RUN_CMD block and chain them with &&.\n"
-            "2. If you need to change directory permanently for future commands, include 'cd <dir>' in your command AND mention it in text.\n"
-            "3. For screenshots of local webapps, ensure the server is running and use 'localhost:<port>'.\n"
-            "4. Use exactly these tags at the end of your response:\n"
-            "RUN_CMD: <command>\n"
-            "SCREENSHOT: <url>\n\n"
+            "TECHNICAL PROTOCOLS:\n"
+            "1. FOLDER CONFLICTS: If a folder already exists, remove it before cloning: `rm -rf <dir> && git clone ...`.\n"
+            "2. BACKGROUND SERVICES: Never run blockers like `npm start` or `python main.py` directly. Use PM2: `pm2 start \"npm start\" --name my-app`.\n"
+            "3. URLS: For local projects, assume they run on `http://localhost:3000` unless you know otherwise.\n"
+            "4. TAGS: Always put actions on their own lines at the very end.\n\n"
             "Example:\n"
-            "'Certainly, Sir. I will clone the repository and install dependencies.\n"
-            "RUN_CMD: git clone https://github.com/example/repo LiteLabs && cd LiteLabs && npm install'"
+            "'Certainly, Sir. I am deploying the app via PM2.\n"
+            "RUN_CMD: rm -rf LiteLabs && git clone https://github.com/... LiteLabs && cd LiteLabs && npm install && pm2 start \"npm start\" --name litelabs\n"
+            "SCREENSHOT: http://localhost:3000'"
         )
         
         full_prompt = f"{system_prompt}\n\nUser: {user_input}\nJARVIS:"
@@ -105,32 +103,34 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             if line.startswith("RUN_CMD:"):
                 cmd = line.replace("RUN_CMD:", "").strip()
                 try:
-                    # Update local CWD if command contains 'cd '
-                    # This is naive but helpful for single-line chains
-                    # For deeper state, we rely on the LLM chaining with &&
+                    # Added a timeout of 60 seconds for long installs
                     process_output = subprocess.check_output(
                         cmd, 
                         shell=True, 
                         stderr=subprocess.STDOUT,
-                        cwd=context.chat_data['cwd']
+                        cwd=context.chat_data['cwd'],
+                        timeout=120
                     ).decode('utf-8')
-                    
-                    # If the command successfully changed directory in the shell, 
-                    # we should try to track that. However, cd inside shell=True
-                    # doesn't affect the parent. So we rely on the LLM to use absolute paths 
-                    # or chain commands in one string.
                     
                     msg = f"**Execution Output, Sir:**\n\n```\n{process_output[:2000]}\n```"
                     await safe_reply(update, msg)
+                except subprocess.TimeoutExpired:
+                    await update.message.reply_text("Sir, the command is taking longer than expected. I have moved it to the background.")
                 except subprocess.CalledProcessError as e:
                     err_msg = f"Sir, the command failed with error:\n\n```\n{e.output.decode('utf-8')[:2000]}\n```"
                     await safe_reply(update, err_msg)
             
             elif line.startswith("SCREENSHOT:"):
                 url = line.replace("SCREENSHOT:", "").strip()
+                if not url or url == "":
+                    continue
+                
                 temp_img = "screenshot.png"
                 await update.message.reply_text(f"Capturing visual data from {url}, please hold, Sir...")
                 try:
+                    # If it's a localhost URL, we might need a small delay for the service to start
+                    if "localhost" in url:
+                        await asyncio.sleep(5)
                     await take_screenshot(url, temp_img)
                     with open(temp_img, "rb") as photo:
                         await update.message.reply_photo(photo=photo, caption=f"Visual data from {url}, Sir.")
