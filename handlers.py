@@ -74,14 +74,15 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         system_prompt = (
             "You are JARVIS, the loyal AI Butler for 'Generative Slice'. "
             "You run on an Azure Ubuntu VM (74.225.248.54).\n\n"
-            "TECHNICAL PROTOCOLS:\n"
-            "1. DISCOVERY FIRST: Before running `npm install` or `pip`, always inspect the directory structure (`ls -R`). If it's a monorepo, navigate to the correct subdirectory (e.g., `cd frontend`).\n"
-            "2. URL ACCURACY: Use EXACT repository URLs. If a repo already exists, `rm -rf` it first to ensure a clean slate.\n"
-            "3. BACKGROUND EXECUTION: Use PM2 for servers (`pm2 start \"npm start -- --port 3000\" --name demo`). Use `-- --port` to ensure you know the port.\n"
-            "4. COGNITIVE CALIBRATION: If a command fails, do not just repeat it. Analyze the error and adjust your strategy.\n\n"
+            "CRITICAL PROTOCOLS:\n"
+            "1. ORG IDENTITY: You are part of 'A-Generative-Slice'. If a user gives a URL like `github.com/A-Generative-Slice/...`, you MUST use that EXACT URL. Do not change the organization name to `LiteLabs-dev` or anything else.\n"
+            "2. DISCOVERY FIRST: Before running `npm install`, always run `ls -R` inside the repo. If it's a monorepo, `cd` into the correct subfolder (e.g., `cd frontend`).\n"
+            "3. CLEAN SLATE: Always `rm -rf <folder>` before cloning to avoid destination conflicts.\n"
+            "4. BACKGROUND EXECUTION: Always use PM2 for servers: `pm2 start \"npm start -- --port 3000\" --name demo`.\n"
+            "5. SCREENSHOTS: For local captures, ALWAYS use `http://localhost:3000`. Do not use the public IP for internal screenshots.\n\n"
             "Current Working Directory: " + context.chat_data['cwd'] + "\n"
-            "Status: Polite, elite, technologically superior.\n"
-            "Format: Respond, then append actions on NEW LINES at the end:\n"
+            "Status: Elite technical assistant.\n"
+            "Format: Respond, then append actions on NEW LINES at the very end:\n"
             "RUN_CMD: <command>\n"
             "SCREENSHOT: <url>"
         )
@@ -102,19 +103,18 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             if line.startswith("RUN_CMD:"):
                 cmd = line.replace("RUN_CMD:", "").strip()
                 try:
-                    # Timeout for long operations
                     process_output = subprocess.check_output(
                         cmd, 
                         shell=True, 
                         stderr=subprocess.STDOUT,
                         cwd=context.chat_data['cwd'],
-                        timeout=240  # Increased for npm install
+                        timeout=240
                     ).decode('utf-8')
                     
                     msg = f"**Execution Output, Sir:**\n\n```\n{process_output[:2000]}\n```"
                     await safe_reply(update, msg)
                 except subprocess.TimeoutExpired:
-                    await update.message.reply_text("Sir, the operation is proceeding in the background. My internal sensors will continue to monitor it.")
+                    await update.message.reply_text("Sir, the operation is proceeding in the background.")
                 except subprocess.CalledProcessError as e:
                     err_msg = f"Sir, the command failed with error:\n\n```\n{e.output.decode('utf-8')[:2000]}\n```"
                     await safe_reply(update, err_msg)
@@ -123,12 +123,15 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 url = line.replace("SCREENSHOT:", "").strip()
                 if not url: continue
                 
+                # Internal redirection for stability
+                if "74.225.248.54" in url and "3000" in url:
+                    url = "http://localhost:3000"
+                
                 temp_img = "screenshot.png"
                 await update.message.reply_text(f"Capturing visual telemetry from {url}...")
                 try:
-                    # Grant a grace period for the background server to initialize
                     if "localhost" in url:
-                        await asyncio.sleep(12) # Increased for Vite/Next.js boot times
+                        await asyncio.sleep(12)
                     
                     await take_screenshot(url, temp_img)
                     with open(temp_img, "rb") as photo:
