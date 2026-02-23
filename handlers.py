@@ -1,18 +1,26 @@
-from telegram import Update
-from telegram.ext import ContextTypes
-
 import os
 import subprocess
 import asyncio
 from google import genai
 from telegram import Update
 from telegram.ext import ContextTypes
+from telegram.error import BadRequest
 
 # playwright will be used for screenshots
 from playwright.async_api import async_playwright
 
 # Configure Gemini Client
 client = genai.Client()
+
+async def safe_reply(update: Update, text: str, parse_mode: str = 'Markdown'):
+    """
+    Attempts to send a reply with Markdown, falling back to plain text if parsing fails.
+    """
+    try:
+        await update.message.reply_text(text, parse_mode=parse_mode)
+    except BadRequest:
+        # Fallback to plain text if Markdown is broken
+        await update.message.reply_text(text, parse_mode=None)
 
 async def take_screenshot(url: str, output_path: str):
     """
@@ -37,7 +45,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• **Visual Feedback:** I can capture screenshots of your local apps or external sites and send them directly to this chat.\n\n"
         "Sir, should we begin with a technical demonstration (cloning a project or running a test), or do you have a specific target in mind?"
     )
-    await update.message.reply_text(welcome_message, parse_mode='Markdown')
+    await safe_reply(update, welcome_message)
 
 async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -51,7 +59,7 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             mem_info = subprocess.check_output(['free', '-h']).decode('utf-8')
             disk_info = subprocess.check_output(['df', '-h', '/']).decode('utf-8')
             response = f"Systems are nominal, Sir.\n\n**Memory:**\n`{mem_info}`\n**Disk:**\n`{disk_info}`"
-            await update.message.reply_text(response, parse_mode='Markdown')
+            await safe_reply(update, response)
             return
         except Exception as e:
             await update.message.reply_text(f"I encountered an issue checking system health: {str(e)}")
@@ -73,7 +81,6 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         
         full_prompt = f"{system_prompt}\n\nUser: {user_input}\nJARVIS:"
         
-        # We'll use the prompt directly for now
         response = client.models.generate_content(
             model="gemini-3-flash-preview", 
             contents=full_prompt
@@ -81,7 +88,7 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         jarvis_reply = response.text
         
         # Let the user know JARVIS is thinking/acting
-        await update.message.reply_text(jarvis_reply, parse_mode='Markdown')
+        await safe_reply(update, jarvis_reply)
 
         # Simple parser for the model's 'actions'
         for line in jarvis_reply.split('\n'):
@@ -89,9 +96,12 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 cmd = line.replace("RUN_CMD:", "").strip()
                 try:
                     process_output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).decode('utf-8')
-                    await update.message.reply_text(f"**Execution Output, Sir:**\n`{process_output[:1000]}`", parse_mode='Markdown')
+                    # For technical output, we use a much shorter snippet and plain text if it fails
+                    msg = f"**Execution Output, Sir:**\n\n```\n{process_output[:2000]}\n```"
+                    await safe_reply(update, msg)
                 except subprocess.CalledProcessError as e:
-                    await update.message.reply_text(f"Sir, the command failed with error:\n`{e.output.decode('utf-8')[:1000]}`", parse_mode='Markdown')
+                    err_msg = f"Sir, the command failed with error:\n\n```\n{e.output.decode('utf-8')[:2000]}\n```"
+                    await safe_reply(update, err_msg)
             
             elif line.startswith("SCREENSHOT:"):
                 url = line.replace("SCREENSHOT:", "").strip()
@@ -107,6 +117,7 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         
     except Exception as e:
         await update.message.reply_text(f"Apologies, Sir. My cognitive link encountered an error: {str(e)}")
+
 
 
 
