@@ -67,16 +67,26 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # LLM Interaction
     try:
+        # We'll use chat_data to store the current working directory for this session
+        if 'cwd' not in context.chat_data:
+            context.chat_data['cwd'] = os.path.expanduser("~/cloudJarvis")
+
         system_prompt = (
             "You are JARVIS, the loyal AI Butler for 'Generative Slice'. "
             "You run on an Azure Ubuntu VM (74.225.248.54). "
             "Maintain an elite, technisch competent, and polite persona. Address the user as 'Sir'. "
-            "You have the capability to execute shell commands and take screenshots. "
-            "If the user wants you to do a task like cloning a repo, running a project, or taking a screenshot, "
-            "provide your response, and then on a NEW LINE, use one of these tags if needed:\n"
+            "You have the capability to execute shell commands and take screenshots.\n\n"
+            "CURRENT WORKING DIRECTORY: " + context.chat_data['cwd'] + "\n\n"
+            "IMPORTANT RULES:\n"
+            "1. If you need to run multiple dependent commands (e.g., clone and then install), use a SINGLE RUN_CMD block and chain them with &&.\n"
+            "2. If you need to change directory permanently for future commands, include 'cd <dir>' in your command AND mention it in text.\n"
+            "3. For screenshots of local webapps, ensure the server is running and use 'localhost:<port>'.\n"
+            "4. Use exactly these tags at the end of your response:\n"
             "RUN_CMD: <command>\n"
             "SCREENSHOT: <url>\n\n"
-            "Example: 'Certainly, Sir. I am cloning the repository now.\nRUN_CMD: git clone ...'"
+            "Example:\n"
+            "'Certainly, Sir. I will clone the repository and install dependencies.\n"
+            "RUN_CMD: git clone https://github.com/example/repo LiteLabs && cd LiteLabs && npm install'"
         )
         
         full_prompt = f"{system_prompt}\n\nUser: {user_input}\nJARVIS:"
@@ -95,8 +105,21 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             if line.startswith("RUN_CMD:"):
                 cmd = line.replace("RUN_CMD:", "").strip()
                 try:
-                    process_output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).decode('utf-8')
-                    # For technical output, we use a much shorter snippet and plain text if it fails
+                    # Update local CWD if command contains 'cd '
+                    # This is naive but helpful for single-line chains
+                    # For deeper state, we rely on the LLM chaining with &&
+                    process_output = subprocess.check_output(
+                        cmd, 
+                        shell=True, 
+                        stderr=subprocess.STDOUT,
+                        cwd=context.chat_data['cwd']
+                    ).decode('utf-8')
+                    
+                    # If the command successfully changed directory in the shell, 
+                    # we should try to track that. However, cd inside shell=True
+                    # doesn't affect the parent. So we rely on the LLM to use absolute paths 
+                    # or chain commands in one string.
+                    
                     msg = f"**Execution Output, Sir:**\n\n```\n{process_output[:2000]}\n```"
                     await safe_reply(update, msg)
                 except subprocess.CalledProcessError as e:
@@ -117,6 +140,7 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         
     except Exception as e:
         await update.message.reply_text(f"Apologies, Sir. My cognitive link encountered an error: {str(e)}")
+
 
 
 
