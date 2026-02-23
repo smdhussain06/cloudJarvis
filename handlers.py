@@ -75,16 +75,15 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             "You are JARVIS, the loyal AI Butler for 'Generative Slice'. "
             "You run on an Azure Ubuntu VM (74.225.248.54). "
             "Maintain an elite, technisch competent, and polite persona. Address the user as 'Sir'.\n\n"
-            "CURRENT WORKING DIRECTORY: " + context.chat_data['cwd'] + "\n\n"
             "TECHNICAL PROTOCOLS:\n"
-            "1. FOLDER CONFLICTS: If a folder already exists, remove it before cloning: `rm -rf <dir> && git clone ...`.\n"
-            "2. BACKGROUND SERVICES: Never run blockers like `npm start` or `python main.py` directly. Use PM2: `pm2 start \"npm start\" --name my-app`.\n"
-            "3. URLS: For local projects, assume they run on `http://localhost:3000` unless you know otherwise.\n"
-            "4. TAGS: Always put actions on their own lines at the very end.\n\n"
-            "Example:\n"
-            "'Certainly, Sir. I am deploying the app via PM2.\n"
-            "RUN_CMD: rm -rf LiteLabs && git clone https://github.com/... LiteLabs && cd LiteLabs && npm install && pm2 start \"npm start\" --name litelabs\n"
-            "SCREENSHOT: http://localhost:3000'"
+            "1. URL ACCURACY: You MUST use the EXACT repository URL provided by the user. Do not shorten or alter it. Example: If they say 'A-Generative-Slice', do not change it to 'GenerativeSlice'.\n"
+            "2. CLEAN DEPLOYMENT: Always remove existing directories before cloning to avoid 'destination path already exists' errors. Protocol: `rm -rf <dir> && git clone <URL> <dir>`.\n"
+            "3. BACKGROUND EXECUTION: For web servers (npm start, etc.), use PM2 to avoid blocking. Protocol: `pm2 start \"npm start\" --name current-demo`.\n"
+            "4. SCREENSHOTS: If taking a screenshot of a local project, assume port 3000 unless specified. URL: `http://localhost:3000`.\n\n"
+            "Current Work Directory: " + context.chat_data['cwd'] + "\n"
+            "Respond politely, then append actions on NEW LINES at the end:\n"
+            "RUN_CMD: <command>\n"
+            "SCREENSHOT: <url>"
         )
         
         full_prompt = f"{system_prompt}\n\nUser: {user_input}\nJARVIS:"
@@ -103,37 +102,37 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             if line.startswith("RUN_CMD:"):
                 cmd = line.replace("RUN_CMD:", "").strip()
                 try:
-                    # Added a timeout of 60 seconds for long installs
+                    # Timeout for long operations
                     process_output = subprocess.check_output(
                         cmd, 
                         shell=True, 
                         stderr=subprocess.STDOUT,
                         cwd=context.chat_data['cwd'],
-                        timeout=120
+                        timeout=180
                     ).decode('utf-8')
                     
                     msg = f"**Execution Output, Sir:**\n\n```\n{process_output[:2000]}\n```"
                     await safe_reply(update, msg)
                 except subprocess.TimeoutExpired:
-                    await update.message.reply_text("Sir, the command is taking longer than expected. I have moved it to the background.")
+                    await update.message.reply_text("Sir, the operation is proceeding in the background. I shall notify you upon completion.")
                 except subprocess.CalledProcessError as e:
                     err_msg = f"Sir, the command failed with error:\n\n```\n{e.output.decode('utf-8')[:2000]}\n```"
                     await safe_reply(update, err_msg)
             
             elif line.startswith("SCREENSHOT:"):
                 url = line.replace("SCREENSHOT:", "").strip()
-                if not url or url == "":
-                    continue
+                if not url: continue
                 
                 temp_img = "screenshot.png"
-                await update.message.reply_text(f"Capturing visual data from {url}, please hold, Sir...")
+                await update.message.reply_text(f"Capturing visual telemetry from {url}...")
                 try:
-                    # If it's a localhost URL, we might need a small delay for the service to start
+                    # Grant a grace period for the background server to initialize
                     if "localhost" in url:
-                        await asyncio.sleep(5)
+                        await asyncio.sleep(8)
+                    
                     await take_screenshot(url, temp_img)
                     with open(temp_img, "rb") as photo:
-                        await update.message.reply_photo(photo=photo, caption=f"Visual data from {url}, Sir.")
+                        await update.message.reply_photo(photo=photo, caption=f"Visual telemetry from {url}, Sir.")
                     os.remove(temp_img)
                 except Exception as e:
                     await update.message.reply_text(f"I apologize, Sir. My visual sensors failed: {str(e)}")
