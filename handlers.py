@@ -3,56 +3,62 @@ from telegram.ext import ContextTypes
 
 import os
 import subprocess
+import google.generativeai as genai
 from telegram import Update
 from telegram.ext import ContextTypes
+
+# Configure Gemini
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Handler for the /start command with the 'Butler' persona.
     """
     welcome_message = (
-        "*(Note: I'm currently waiting for a Brave Search key for native search, but I can still fetch any URL you give me).* \n\n"
+        "*(Note: My neural bridge is now active via Gemini 1.5).* \n\n"
         "• **System Mastery:** I can run shell commands, manage background processes, and interact with your filesystem directly on the Azure VM.\n"
         "• **Task Management & Memory:** I maintain a long-term memory and daily logs.\n\n"
         "🧩 **Specialized Skills (The 'Butler' Toolkit)**\n"
-        "I'm pre-configured for:\n"
-        "• **Weather:** For when you're considering touching grass.\n"
-        "• **Healthcheck:** To keep this deployment secure and hardened.\n\n"
+        "I'm now powered by Large Language Model intelligence.\n\n"
         "What's the first order of business, Sir? Should we start on an app, or do you have a specific research rabbit hole you'd like me to dive into?"
     )
     await update.message.reply_text(welcome_message, parse_mode='Markdown')
 
 async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Advanced handler for JARVIS.
+    Smart handler for JARVIS using Gemini.
     """
-    user_input = update.message.text.lower()
+    user_input = update.message.text
     
-    # 1. Cloud Awareness Check (Handles "where are you", "where are u", "running on cloud")
-    if any(phrase in user_input for phrase in ["running on cloud", "where are you", "where are u"]):
-        response = (
-            "Yes, Sir. I am currently running on your **Azure Ubuntu VM (Standard B2ats v2)** in Central India.\n"
-            "Public IP: `74.225.248.54`\n"
-            "Persistence is managed by **PM2**. I am ready for 24/7 duty."
-        )
-    
-    # 2. Healthcheck Skill (Handles "healthcheck", "health check", "status")
-    elif any(phrase in user_input for phrase in ["healthcheck", "health check", "status"]):
+    # Check for direct system commands first
+    if any(phrase in user_input.lower() for phrase in ["healthcheck", "status", "system status"]):
         try:
-            # Simple check of memory availability on the VM
             mem_info = subprocess.check_output(['free', '-m']).decode('utf-8')
-            response = f"Systems are nominal, Sir.\n\n**Memory Status:**\n`{mem_info}`"
+            disk_info = subprocess.check_output(['df', '-h', '/']).decode('utf-8')
+            response = f"Systems are nominal, Sir.\n\n**Memory:**\n`{mem_info}`\n**Disk:**\n`{disk_info}`"
+            await update.message.reply_text(response, parse_mode='Markdown')
+            return
         except Exception as e:
-            response = f"I encountered an issue checking system health: {str(e)}"
+            await update.message.reply_text(f"I encountered an issue checking system health: {str(e)}")
+            return
 
-
-    # 3. Default Persona Response
-    else:
-        response = (
-            f"I've noted your message: *\"{update.message.text}\"*.\n\n"
-            "I'm currently in 'Observer Mode' while we finalize the OpenClaw bridge integration. "
-            "Would you like me to perform a **Healthcheck** or check the **Weather**?"
+    # Fallback to LLM for everything else
+    try:
+        system_prompt = (
+            "You are JARVIS, a highly sophisticated and loyal AI Butler for 'Generative Slice'. "
+            "You are currently running on an Azure Ubuntu VM (Standard B2ats v2) in Central India (74.225.248.54). "
+            "Maintain a polite, elite, and technically proficient persona. Address the user as 'Sir'. "
+            "You are aware of the environment (Linux, Node.js v22). If asked about yourself, confirm you are now truly 'smart' via Gemini."
         )
-    
-    await update.message.reply_text(response, parse_mode='Markdown')
+        
+        chat_session = model.start_chat(history=[])
+        full_prompt = f"{system_prompt}\n\nUser: {user_input}\nJARVIS:"
+        
+        response = chat_session.send_message(full_prompt)
+        await update.message.reply_text(response.text, parse_mode='Markdown')
+        
+    except Exception as e:
+        await update.message.reply_text(f"Apologies, Sir. My cognitive link encountered an error: {str(e)}")
+
 
